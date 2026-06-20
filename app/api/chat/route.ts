@@ -2,14 +2,15 @@ import { NextRequest } from 'next/server';
 import Groq from 'groq-sdk';
 
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY!,
+  apiKey: process.env.GROQ_API_KEY || '',
 });
 
 export async function POST(request: NextRequest) {
   try {
     const { messages, persona } = await request.json();
 
-    const systemPrompt = `You are ${persona}, a highly professional, empathetic, and knowledgeable expert. Provide detailed, structured, and helpful responses.`;
+    const systemPrompt = `You are ${persona}, a highly professional, empathetic, and knowledgeable expert. 
+    Give detailed, structured, and actionable advice.`;
 
     const completion = await groq.chat.completions.create({
       messages: [
@@ -26,7 +27,9 @@ export async function POST(request: NextRequest) {
     return Response.json({ reply });
 
   } catch (error: any) {
-    console.error("Error:", error.message);
-    return Response.json({ reply: "Sorry, I'm having trouble connecting right now. Please try again." });
+    console.error("Groq Error:", error.message);
+    return Response.json({ 
+      reply: "Sorry, I'm having trouble connecting right now. Please try again." 
+    });
   }
 }
