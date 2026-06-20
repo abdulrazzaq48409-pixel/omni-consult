@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 const personas = [
   { id: 'finance', name: 'Alex Rivera, CFA', title: 'Senior Investment Strategist', avatar: 'https://randomuser.me/api/portraits/men/45.jpg' },
-  { id: 'doctor', name: 'Dr. Sarah Chen', title: 'Internal Medicine & Cardiology', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
+  { id: 'doctor', name: 'Dr. Sarah Chen', title: 'Internal Medicine', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
   { id: 'realestate', name: 'Mia Thompson', title: 'Luxury Real Estate Advisor', avatar: 'https://randomuser.me/api/portraits/women/65.jpg' },
-  { id: 'lawyer', name: 'James Mitchell Esq.', title: 'Corporate & Family Attorney', avatar: 'https://randomuser.me/api/portraits/men/67.jpg' },
+  { id: 'lawyer', name: 'James Mitchell Esq.', title: 'Corporate Attorney', avatar: 'https://randomuser.me/api/portraits/men/67.jpg' },
 ];
 
 export default function OmniConsult() {
@@ -20,19 +20,24 @@ export default function OmniConsult() {
 
   const currentPersona = personas.find(p => p.id === selectedPersona)!;
   const { transcript, listening, resetTranscript } = useSpeechRecognition();
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Memory - Persistent across persona changes (basic version)
+  // Auto scroll to latest message
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([{
-        role: 'assistant',
-        content: `Hello, I'm ${currentPersona.name}, ${currentPersona.title}. How can I help you with your situation today?`
-      }]);
-    }
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Welcome message
+  useEffect(() => {
+    setMessages([{
+      role: 'assistant',
+      content: `Hello! I'm ${currentPersona.name}, ${currentPersona.title}. How can I help you today?`
+    }]);
   }, [selectedPersona]);
 
+  // Voice input
   useEffect(() => {
-    if (transcript && isAudioCall) {
+    if (transcript && isAudioCall && transcript.trim()) {
       sendMessage(transcript);
       resetTranscript();
     }
@@ -49,7 +54,7 @@ export default function OmniConsult() {
     setInput('');
     setIsLoading(true);
 
-    setMessages(prev => [...prev, { role: 'assistant', content: 'Analyzing your request...' }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: 'Thinking...' }]);
 
     try {
       const res = await fetch('/api/chat', {
@@ -62,91 +67,125 @@ export default function OmniConsult() {
       });
 
       const data = await res.json();
-      const reply = data.reply;
+      const reply = data.reply || "I'm here to help. What would you like to know?";
 
-      setMessages(prev => prev.filter(m => m.content !== 'Analyzing your request...'));
+      setMessages(prev => prev.filter(m => m.content !== 'Thinking...'));
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
 
       const utterance = new SpeechSynthesisUtterance(reply);
-      utterance.rate = 0.93;
+      utterance.rate = 0.95;
       window.speechSynthesis.speak(utterance);
-
     } catch (e) {
-      setMessages(prev => prev.filter(m => m.content !== 'Analyzing your request...'));
-      setMessages(prev => [...prev, { role: 'assistant', content: "I apologize, please try again." }]);
+      setMessages(prev => prev.filter(m => m.content !== 'Thinking...'));
+      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, please try again." }]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const toggleAudioCall = () => {
+    if (!isAudioCall) {
+      SpeechRecognition.startListening({ continuous: true });
+      setIsAudioCall(true);
+    } else {
+      SpeechRecognition.stopListening();
+      setIsAudioCall(false);
+      resetTranscript();
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-black text-white">
+    <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
       {/* Sidebar */}
-      <div className="w-96 bg-zinc-950 border-r border-zinc-800 p-8 overflow-auto">
-        <h1 className="text-5xl font-bold mb-2">OmniConsult</h1>
-        <p className="text-emerald-400 mb-10">Your Personal Expert Network</p>
-
-        <h3 className="uppercase text-xs tracking-widest text-zinc-500 mb-6">EXPERTS</h3>
-        {personas.map(p => (
-          <button
-            key={p.id}
-            onClick={() => setSelectedPersona(p.id)}
-            className={`w-full p-6 rounded-3xl mb-4 flex gap-6 transition-all ${selectedPersona === p.id ? 'bg-white text-black scale-105' : 'hover:bg-zinc-900'}`}
-          >
-            <img src={p.avatar} className="w-20 h-20 rounded-2xl" />
-            <div className="text-left">
-              <div className="font-semibold text-2xl">{p.name}</div>
-              <div className="text-zinc-400">{p.title}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {/* Premium Consultation Room */}
-      <div className="flex-1 flex flex-col">
-        <div className="h-[560px] bg-zinc-950 relative flex items-center justify-center">
-          <div className="text-center z-10">
-            <img src={currentPersona.avatar} className="w-80 h-80 rounded-full mx-auto mb-10 shadow-[0_0_60px_rgb(16,185,129)]" />
-            <h2 className="text-5xl font-bold mb-3">{currentPersona.name}</h2>
-            <p className="text-2xl text-emerald-400">{currentPersona.title}</p>
-          </div>
-
-          {(isAudioCall || isVideoCall) && (
-            <div className="absolute bottom-16 bg-red-600 px-12 py-5 rounded-2xl text-2xl font-medium">
-              {isVideoCall ? "📹 LIVE VIDEO CONSULTATION" : "🎤 LIVE AUDIO CONSULTATION"}
-            </div>
-          )}
+      <div className="w-72 border-r border-zinc-800 bg-zinc-950 p-5 overflow-y-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">OmniConsult</h1>
+          <p className="text-emerald-400 text-sm">Your AI Experts</p>
         </div>
 
-        <div className="flex-1 p-10 overflow-auto space-y-8">
+        <button className="w-full mb-8 bg-white text-black py-3 rounded-2xl font-medium hover:bg-zinc-100 transition">
+          + New Consultation
+        </button>
+
+        <h3 className="text-xs uppercase tracking-widest text-zinc-500 mb-4">EXPERTS</h3>
+        
+        <div className="space-y-1">
+          {personas.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setSelectedPersona(p.id)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                selectedPersona === p.id ? 'bg-zinc-800' : 'hover:bg-zinc-900'
+              }`}
+            >
+              <img src={p.avatar} className="w-10 h-10 rounded-full" />
+              <div className="text-left">
+                <div className="font-medium text-sm">{p.name}</div>
+                <div className="text-xs text-zinc-400">{p.title}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Compact Header */}
+        <div className="h-16 border-b border-zinc-800 flex items-center px-6 bg-zinc-950">
+          <img src={currentPersona.avatar} className="w-9 h-9 rounded-full mr-3" />
+          <div>
+            <div className="font-semibold text-base">{currentPersona.name}</div>
+            <div className="text-xs text-emerald-400 -mt-0.5">{currentPersona.title}</div>
+          </div>
+        </div>
+
+        {/* Chat Area - Optimized Size */}
+        <div className="flex-1 p-8 overflow-y-auto space-y-7 bg-zinc-950">
           {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : ''}`}>
-              <div className={`max-w-3xl px-8 py-7 rounded-3xl text-lg ${m.role === 'user' ? 'bg-blue-600' : 'bg-zinc-900 border border-zinc-800'}`}>
+            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[65%] px-6 py-4 rounded-2xl text-[17px] leading-relaxed ${
+                m.role === 'user' ? 'bg-blue-600' : 'bg-zinc-900'
+              }`}>
                 {m.content}
               </div>
             </div>
           ))}
+          <div ref={chatEndRef} />
         </div>
 
-        <div className="p-8 border-t border-zinc-800 bg-zinc-950">
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <button onClick={() => setIsAudioCall(!isAudioCall)} className="py-7 text-xl font-semibold rounded-3xl bg-emerald-600 hover:bg-emerald-500">
-              {isAudioCall ? "End Audio Call" : "🎤 Start Audio Call"}
+        {/* Bottom Input Bar */}
+        <div className="p-6 border-t border-zinc-800 bg-zinc-900">
+          <div className="flex gap-3 mb-4">
+            <button 
+              onClick={toggleAudioCall}
+              className="flex-1 py-4 rounded-2xl font-medium flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 transition"
+            >
+              🎤 {isAudioCall ? 'End Audio Call' : 'Voice Call'}
             </button>
-            <button onClick={() => setIsVideoCall(!isVideoCall)} className="py-7 text-xl font-semibold rounded-3xl bg-gradient-to-r from-purple-600 to-pink-600">
-              {isVideoCall ? "End Video Call" : "📹 Start Video Call"}
+            <button 
+              onClick={() => setIsVideoCall(!isVideoCall)}
+              className="flex-1 py-4 rounded-2xl font-medium flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:brightness-110"
+            >
+              📹 {isVideoCall ? 'End Video Call' : 'Video Call'}
             </button>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <input
               value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendMessage()}
-              placeholder="Ask your question..."
-              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-3xl px-8 py-7 text-lg"
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="Type your message or speak..."
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-2xl px-6 py-4 text-base focus:outline-none focus:border-blue-500"
+              disabled={isLoading}
             />
-            <button onClick={() => sendMessage()} className="bg-blue-600 px-16 rounded-3xl font-semibold text-lg">Send</button>
+            <button 
+              onClick={() => sendMessage()} 
+              disabled={isLoading || !input.trim()}
+              className="bg-blue-600 hover:bg-blue-500 px-10 rounded-2xl font-medium disabled:opacity-50"
+            >
+              Send
+            </button>
           </div>
         </div>
       </div>
