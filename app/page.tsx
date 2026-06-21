@@ -93,7 +93,6 @@ export default function OmniConsult() {
 
   return (
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
-      {/* Sidebar */}
       <div className="w-72 border-r border-zinc-800 bg-zinc-950 p-5 overflow-y-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">OmniConsult</h1>
@@ -121,7 +120,6 @@ export default function OmniConsult() {
         </div>
       </div>
 
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         <div className="h-16 border-b border-zinc-800 flex items-center px-6 bg-zinc-950">
           <img src={currentPersona.avatar} className="w-9 h-9 rounded-full mr-3" />
