@@ -10,7 +10,7 @@ const personas = [
   { id: 'lawyer', name: 'James Mitchell Esq.', title: 'Corporate Attorney', avatar: 'https://randomuser.me/api/portraits/men/67.jpg' },
 ];
 
-export default function OmniConsult() {
+export default function OmniConsultApp() {
   const [selectedPersona, setSelectedPersona] = useState('finance');
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
@@ -64,7 +64,7 @@ export default function OmniConsult() {
       });
 
       const data = await res.json();
-      const reply = data.reply || "I'm here to help. Could you please rephrase?";
+      const reply = data.reply || "Sorry, please try again.";
 
       setMessages(prev => prev.filter(m => m.content !== 'Thinking...'));
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
@@ -93,14 +93,18 @@ export default function OmniConsult() {
 
   return (
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
+      {/* Sidebar */}
       <div className="w-72 border-r border-zinc-800 bg-zinc-950 p-5 overflow-y-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">OmniConsult</h1>
           <p className="text-emerald-400 text-sm">Expert AI Network</p>
         </div>
 
-        <button className="w-full mb-8 bg-white text-black py-3 rounded-2xl font-medium hover:bg-zinc-100">
-          + New Consultation
+        <button 
+          onClick={() => window.location.href = '/'}
+          className="w-full mb-8 bg-white text-black py-3 rounded-2xl font-medium hover:bg-zinc-100 transition"
+        >
+          ← Back to Home
         </button>
 
         <h3 className="text-xs uppercase tracking-widest text-zinc-500 mb-4">EXPERTS</h3>
@@ -124,6 +128,7 @@ export default function OmniConsult() {
         </div>
       </div>
 
+      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         <div className="h-16 border-b border-zinc-800 flex items-center px-6 bg-zinc-950">
           <img src={currentPersona.avatar} className="w-9 h-9 rounded-full mr-3" />
@@ -149,10 +154,10 @@ export default function OmniConsult() {
         <div className="p-6 border-t border-zinc-800 bg-zinc-900">
           <div className="flex gap-3 mb-4">
             <button onClick={toggleAudioCall} className="flex-1 py-4 rounded-2xl font-medium bg-emerald-600 hover:bg-emerald-500">
-              🎤 {isAudioCall ? 'End Audio' : 'Voice Call'}
+              🎤 {isAudioCall ? 'End Audio Call' : 'Voice Call'}
             </button>
             <button onClick={() => setIsVideoCall(!isVideoCall)} className="flex-1 py-4 rounded-2xl font-medium bg-gradient-to-r from-purple-600 to-pink-600">
-              📹 {isVideoCall ? 'End Video' : 'Video Call'}
+              📹 {isVideoCall ? 'End Video Call' : 'Video Call'}
             </button>
           </div>
 
