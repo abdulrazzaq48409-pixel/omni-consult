@@ -1,0 +1,176 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+
+const personas = [
+  { id: 'finance', name: 'Alex Rivera, CFA', title: 'Senior Investment Strategist', avatar: 'https://randomuser.me/api/portraits/men/45.jpg' },
+  { id: 'doctor', name: 'Dr. Sarah Chen', title: 'Internal Medicine', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
+  { id: 'realestate', name: 'Mia Thompson', title: 'Luxury Real Estate Advisor', avatar: 'https://randomuser.me/api/portraits/women/65.jpg' },
+  { id: 'lawyer', name: 'James Mitchell Esq.', title: 'Corporate Attorney', avatar: 'https://randomuser.me/api/portraits/men/67.jpg' },
+];
+
+export default function OmniConsult() {
+  const [selectedPersona, setSelectedPersona] = useState('finance');
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAudioCall, setIsAudioCall] = useState(false);
+  const [isVideoCall, setIsVideoCall] = useState(false);
+
+  const currentPersona = personas.find(p => p.id === selectedPersona)!;
+  const { transcript, listening, resetTranscript } = useSpeechRecognition();
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    setMessages([{
+      role: 'assistant',
+      content: `Hi, I'm ${currentPersona.name}. ${currentPersona.title}. How can I help you today?`
+    }]);
+  }, [selectedPersona]);
+
+  useEffect(() => {
+    if (transcript && isAudioCall && transcript.trim()) {
+      sendMessage(transcript);
+      resetTranscript();
+    }
+  }, [transcript]);
+
+  const sendMessage = async (voiceInput?: string) => {
+    const text = voiceInput || input;
+    if (!text.trim() || isLoading) return;
+
+    const userMsg = { role: 'user', content: text };
+    const newMessages = [...messages, userMsg];
+
+    setMessages(newMessages);
+    setInput('');
+    setIsLoading(true);
+
+    setMessages(prev => [...prev, { role: 'assistant', content: 'Thinking...' }]);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: newMessages, 
+          persona: `${currentPersona.name} - ${currentPersona.title}` 
+        }),
+      });
+
+      const data = await res.json();
+      const reply = data.reply || "I'm here to help. Could you please rephrase?";
+
+      setMessages(prev => prev.filter(m => m.content !== 'Thinking...'));
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+
+      const utterance = new SpeechSynthesisUtterance(reply);
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      setMessages(prev => prev.filter(m => m.content !== 'Thinking...'));
+      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, please try again." }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleAudioCall = () => {
+    if (!isAudioCall) {
+      SpeechRecognition.startListening({ continuous: true });
+      setIsAudioCall(true);
+    } else {
+      SpeechRecognition.stopListening();
+      setIsAudioCall(false);
+      resetTranscript();
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
+      <div className="w-72 border-r border-zinc-800 bg-zinc-950 p-5 overflow-y-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">OmniConsult</h1>
+          <p className="text-emerald-400 text-sm">Expert AI Network</p>
+        </div>
+
+        <button className="w-full mb-8 bg-white text-black py-3 rounded-2xl font-medium hover:bg-zinc-100">
+          + New Consultation
+        </button>
+
+        <h3 className="text-xs uppercase tracking-widest text-zinc-500 mb-4">EXPERTS</h3>
+        
+        <div className="space-y-1">
+          {personas.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setSelectedPersona(p.id)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                selectedPersona === p.id ? 'bg-zinc-800' : 'hover:bg-zinc-900'
+              }`}
+            >
+              <img src={p.avatar} className="w-10 h-10 rounded-full" />
+              <div className="text-left">
+                <div className="font-medium text-sm">{p.name}</div>
+                <div className="text-xs text-zinc-400">{p.title}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        <div className="h-16 border-b border-zinc-800 flex items-center px-6 bg-zinc-950">
+          <img src={currentPersona.avatar} className="w-9 h-9 rounded-full mr-3" />
+          <div>
+            <div className="font-semibold">{currentPersona.name}</div>
+            <div className="text-xs text-emerald-400">{currentPersona.title}</div>
+          </div>
+        </div>
+
+        <div className="flex-1 p-8 overflow-y-auto space-y-7 bg-zinc-950">
+          {messages.map((m, i) => (
+            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[70%] px-6 py-4 rounded-2xl text-[17px] leading-relaxed ${
+                m.role === 'user' ? 'bg-blue-600' : 'bg-zinc-900'
+              }`}>
+                {m.content}
+              </div>
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+
+        <div className="p-6 border-t border-zinc-800 bg-zinc-900">
+          <div className="flex gap-3 mb-4">
+            <button onClick={toggleAudioCall} className="flex-1 py-4 rounded-2xl font-medium bg-emerald-600 hover:bg-emerald-500">
+              🎤 {isAudioCall ? 'End Audio' : 'Voice Call'}
+            </button>
+            <button onClick={() => setIsVideoCall(!isVideoCall)} className="flex-1 py-4 rounded-2xl font-medium bg-gradient-to-r from-purple-600 to-pink-600">
+              📹 {isVideoCall ? 'End Video' : 'Video Call'}
+            </button>
+          </div>
+
+          <div className="flex gap-3">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="Type your message..."
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-2xl px-6 py-4"
+              disabled={isLoading}
+            />
+            <button onClick={() => sendMessage()} disabled={isLoading || !input.trim()} className="bg-blue-600 px-10 rounded-2xl font-medium">
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
